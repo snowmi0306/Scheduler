@@ -8,6 +8,8 @@ import java.time.LocalDate;
 class HealthcarePanel extends JPanel {
     private SchedulerApp parent;
     private MainPanel mainPanel;
+    private DatabaseManager databaseManager;
+    private int userId = -1;
 
     private JTabbedPane tabbedPane;
 
@@ -39,9 +41,10 @@ class HealthcarePanel extends JPanel {
     private static double height = 0;
     private static int age = 0;
 
-    public HealthcarePanel(SchedulerApp parent, MainPanel mainPanel) {
+    public HealthcarePanel(SchedulerApp parent, MainPanel mainPanel, DatabaseManager databaseManager) {
         this.parent = parent;
         this.mainPanel = mainPanel;
+        this.databaseManager = databaseManager;
 
         setLayout(new BorderLayout(12, 12));
         setBorder(new EmptyBorder(12, 12, 12, 12));
@@ -71,6 +74,22 @@ class HealthcarePanel extends JPanel {
         bodyInfoSaveBtn.addActionListener(e -> saveBodyInfo());
         backBtn.addActionListener(e -> parent.showCard("main"));
 
+        refreshSummary();
+    }
+
+    public void setUserContext(int userId) {
+        this.userId = userId;
+    }
+
+    public void applyStoredBodyInfo(double storedWeight, double storedHeight) {
+        weight = storedWeight;
+        height = storedHeight;
+        if (weightSpinner != null) {
+            weightSpinner.setValue((int) storedWeight);
+        }
+        if (heightSpinner != null) {
+            heightSpinner.setValue((int) storedHeight);
+        }
         refreshSummary();
     }
 
@@ -208,12 +227,18 @@ class HealthcarePanel extends JPanel {
         age = ((Number) ageSpinner.getValue()).intValue();
 
         JOptionPane.showMessageDialog(this, "신체 정보가 저장되었습니다.\n체중: " + (int)weight + " kg, 키: " + (int)height + " cm, 나이: " + age + " 세");
+        if (userId > 0 && databaseManager != null) {
+            databaseManager.updateUserStats(userId, mainPanel.getCoins(), mainPanel.getHpValue(), weight, height);
+        }
         refreshSummary();
     }
 
     private void submitFood() {
         int kcal = (Integer) foodSpinner.getValue();
         mainPanel.addFoodCalories(LocalDate.now(), kcal);
+        if (userId > 0 && databaseManager != null) {
+            databaseManager.insertCalorieLog(userId, LocalDate.now(), kcal);
+        }
         JOptionPane.showMessageDialog(this, "음식 입력 완료: " + kcal + " kcal");
         refreshSummary();
     }
@@ -241,6 +266,9 @@ class HealthcarePanel extends JPanel {
 
         int kcal = perHour * minutes / 60;
         mainPanel.addExerciseCalories(LocalDate.now(), kcal);
+        if (userId > 0 && databaseManager != null) {
+            databaseManager.insertExerciseLog(userId, LocalDate.now(), type, minutes);
+        }
         JOptionPane.showMessageDialog(this, type + " " + minutes + "분 입력 완료: " + kcal + " kcal (기준 " + perHour + " kcal/시간)");
         refreshSummary();
     }
@@ -248,6 +276,9 @@ class HealthcarePanel extends JPanel {
     private void submitSleep() {
         int hours = (Integer) sleepHoursSpinner.getValue();
         mainPanel.addSleepHours(LocalDate.now(), hours);
+        if (userId > 0 && databaseManager != null) {
+            databaseManager.insertSleepLog(userId, LocalDate.now(), hours);
+        }
         JOptionPane.showMessageDialog(this, "수면 입력 완료: " + hours + " 시간");
         refreshSummary();
     }

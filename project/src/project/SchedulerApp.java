@@ -2,6 +2,7 @@ package project;
 
 import javax.swing.*;
 import java.awt.*;
+import java.sql.SQLException;
 
 public class SchedulerApp extends JFrame {
     private CardLayout cardLayout;
@@ -10,6 +11,9 @@ public class SchedulerApp extends JFrame {
     private MainPanel mainPanel;
     private HealthcarePanel healthcarePanel;
     private Shop shopPanel;
+
+    private final DatabaseManager databaseManager;
+    private int userId = -1;
 
     public SchedulerApp() {
         // 창 제목 통일
@@ -21,9 +25,16 @@ public class SchedulerApp extends JFrame {
         cardLayout = new CardLayout();
         cards = new JPanel(cardLayout);
 
+        databaseManager = new DatabaseManager("health_scheduler.db");
+        try {
+            databaseManager.initialize();
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "데이터베이스 초기화에 실패했습니다: " + e.getMessage());
+        }
+
         registrationPanel = new RegistrationPanel(this);
-        mainPanel = new MainPanel();
-        healthcarePanel = new HealthcarePanel(this, mainPanel);
+        mainPanel = new MainPanel(databaseManager);
+        healthcarePanel = new HealthcarePanel(this, mainPanel, databaseManager);
         shopPanel = new Shop(this, mainPanel);
 
         cards.add(registrationPanel, "register");
@@ -32,7 +43,7 @@ public class SchedulerApp extends JFrame {
         cards.add(shopPanel, "shop");
 
         add(cards);
-        cardLayout.show(cards, "register");
+        loadUserOrShowRegistration();
 
         // 헬스케어 이동
         mainPanel.getHealthcareButton().addActionListener(e -> {
@@ -51,6 +62,22 @@ public class SchedulerApp extends JFrame {
         shopPanel.getBackButton().addActionListener(e -> showCard("main"));
     }
 
+    private void loadUserOrShowRegistration() {
+        databaseManager.loadFirstUser().ifPresentOrElse(user -> {
+            if (user.registered()) {
+                userId = user.id();
+                mainPanel.setUserContext(userId);
+                mainPanel.setUserInfo(user.nickname(), user.character());
+                mainPanel.setStats(user.coins(), user.hp());
+                healthcarePanel.applyStoredBodyInfo(user.weight(), user.height());
+                healthcarePanel.setUserContext(userId);
+                showCard("main");
+            } else {
+                showCard("register");
+            }
+        }, () -> showCard("register"));
+    }
+
     public void showCard(String name) {
         cardLayout.show(cards, name);
     }
@@ -58,5 +85,21 @@ public class SchedulerApp extends JFrame {
     public void showMain(String nickname, String avatarIcon) {
         mainPanel.setUserInfo(nickname, avatarIcon);
         showCard("main");
+    }
+
+    public void completeRegistration(String nickname, String avatarIcon) {
+        try {
+            userId = databaseManager.saveOrUpdateUser(nickname, avatarIcon);
+            mainPanel.setUserContext(userId);
+            mainPanel.setUserInfo(nickname, avatarIcon);
+            healthcarePanel.setUserContext(userId);
+            showCard("main");
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "사용자 저장 중 오류가 발생했습니다: " + ex.getMessage());
+        }
+    }
+
+    public DatabaseManager getDatabaseManager() {
+        return databaseManager;
     }
 }

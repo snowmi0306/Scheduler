@@ -53,7 +53,7 @@ class RegistrationPanel extends JPanel {
                 JOptionPane.showMessageDialog(this, "닉네임을 입력해주세요.");
                 return;
             }
-            parent.showMain(name, avatar);
+            parent.completeRegistration(name, avatar);
         });
         add(createBtn, BorderLayout.SOUTH);
     }
