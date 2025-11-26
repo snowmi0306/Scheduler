@@ -1,13 +1,14 @@
 PRAGMA foreign_keys = ON;
 
 -- 기본 정보
--- user (nickname, character, weight, height, coin)
+-- user (nickname, character, weight, height, age, coin)
 CREATE TABLE IF NOT EXISTS user (
     id          INTEGER PRIMARY KEY AUTOINCREMENT, -- 고유 번호
     nickname    TEXT NOT NULL,          -- 닉네임
     character   TEXT,                   -- 캐릭터 이름
     weight      REAL,                   -- 몸무게 (kg)
     height      REAL,                   -- 키 (cm)
+    age         INTEGER NOT NULL DEFAULT 0, -- 나이 (년)
     coin        INTEGER NOT NULL DEFAULT 0,  -- 보유 코인
     hp          INTEGER NOT NULL DEFAULT 100, -- 캐릭터 HP
     is_registered INTEGER NOT NULL DEFAULT 1     -- 가입 여부 0: 미가입/1: 가입 -> 최초 생성 창 출력할 시 필요!

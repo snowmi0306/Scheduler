@@ -11,6 +11,8 @@ class MainPanel extends JPanel {
     // 사용자 정보
     private String nickname = "사용자";
     private String avatarIcon = "여자1";
+    private int userId = -1;
+    private final DatabaseManager databaseManager;
 
     // 상단 UI
     private JLabel avatarLabel;
@@ -52,7 +54,8 @@ class MainPanel extends JPanel {
     // 배경 원복용
     private Color originalBackground = null;
 
-    public MainPanel() {
+    public MainPanel(DatabaseManager databaseManager) {
+        this.databaseManager = databaseManager;
         setLayout(new BorderLayout(12, 12));
         setBorder(new EmptyBorder(12, 12, 12, 12));
 
@@ -257,6 +260,7 @@ class MainPanel extends JPanel {
                     if (!content.contains("실패")) {
                         map.put(lt, content.replace("미완료", "실패").replace("완료", "실패"));
                         hpBar.setValue(Math.max(0, hpBar.getValue() - 15));
+                        persistStats();
                         loadSchedulesForSelectedDate();
                     }
                 }
@@ -310,6 +314,7 @@ class MainPanel extends JPanel {
         coins += amount;
         coinLabel.setText("Coins: " + coins);
         JOptionPane.showMessageDialog(this, amount + " 코인이 지급되었습니다. 현재 코인: " + coins);
+        persistStats();
     }
 
     // 23:59 기준 섭취 칼로리 보상(50 코인)
@@ -342,6 +347,16 @@ class MainPanel extends JPanel {
         nameLabel.setText("닉네임: " + this.nickname);
     }
 
+    public void setStats(int coins, int hp) {
+        this.coins = coins;
+        coinLabel.setText("Coins: " + coins);
+        hpBar.setValue(hp);
+    }
+
+    public void setUserContext(int userId) {
+        this.userId = userId;
+    }
+
     // 일정 목록 로딩
     private void loadSchedulesForSelectedDate() {
         LocalDate selectedDate = (LocalDate) dateSelector.getSelectedItem();
@@ -365,6 +380,7 @@ class MainPanel extends JPanel {
     public JButton getShopButton() { return shopBtn; }
     public String getNickname() { return nickname; }
     public String getAvatarIcon() { return avatarIcon; }
+    public int getHpValue() { return hpBar.getValue(); }
 
     // 헬스케어 데이터 추가
     public void addFoodCalories(LocalDate date, int kcal) {
@@ -423,6 +439,7 @@ class MainPanel extends JPanel {
         if (food > allowed) {
             int hpLoss = 10;
             hpBar.setValue(Math.max(0, hpBar.getValue() - hpLoss));
+            persistStats();
             JOptionPane.showMessageDialog(this, "칼로리 초과! HP -" + hpLoss);
         }
     }
@@ -435,6 +452,7 @@ class MainPanel extends JPanel {
         if (coins < amount) return false;
         coins -= amount;
         coinLabel.setText("Coins: " + coins);
+        persistStats();
         return true;
     }
 
@@ -442,11 +460,13 @@ class MainPanel extends JPanel {
         if (amount <= 0) return;
         coins += amount;
         coinLabel.setText("Coins: " + coins);
+        persistStats();
     }
 
     public void restoreHPBy(int amount) {
         if (amount <= 0) return;
         hpBar.setValue(Math.min(100, hpBar.getValue() + amount));
+        persistStats();
     }
 
     public void changeBackground(Color color) {
@@ -461,6 +481,12 @@ class MainPanel extends JPanel {
         if (originalBackground != null) {
             this.setBackground(originalBackground);
             repaint();
+        }
+    }
+
+    private void persistStats() {
+        if (userId > 0 && databaseManager != null) {
+            databaseManager.updateUserStats(userId, coins, hpBar.getValue(), HealthcarePanel.getWeight(), HealthcarePanel.getUserHeight(), HealthcarePanel.getAge());
         }
     }
 
