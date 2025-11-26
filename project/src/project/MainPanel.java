@@ -260,6 +260,7 @@ class MainPanel extends JPanel {
                     if (!content.contains("실패")) {
                         map.put(lt, content.replace("미완료", "실패").replace("완료", "실패"));
                         hpBar.setValue(Math.max(0, hpBar.getValue() - 15));
+                        persistStats();
                         loadSchedulesForSelectedDate();
                     }
                 }
@@ -438,6 +439,7 @@ class MainPanel extends JPanel {
         if (food > allowed) {
             int hpLoss = 10;
             hpBar.setValue(Math.max(0, hpBar.getValue() - hpLoss));
+            persistStats();
             JOptionPane.showMessageDialog(this, "칼로리 초과! HP -" + hpLoss);
         }
     }
@@ -458,6 +460,7 @@ class MainPanel extends JPanel {
         if (amount <= 0) return;
         coins += amount;
         coinLabel.setText("Coins: " + coins);
+        persistStats();
     }
 
     public void restoreHPBy(int amount) {
@@ -483,7 +486,7 @@ class MainPanel extends JPanel {
 
     private void persistStats() {
         if (userId > 0 && databaseManager != null) {
-            databaseManager.updateUserStats(userId, coins, hpBar.getValue(), HealthcarePanel.getWeight(), HealthcarePanel.getUserHeight());
+            databaseManager.updateUserStats(userId, coins, hpBar.getValue(), HealthcarePanel.getWeight(), HealthcarePanel.getUserHeight(), HealthcarePanel.getAge());
         }
     }
 

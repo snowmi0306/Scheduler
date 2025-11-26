@@ -29,10 +29,17 @@ public class DatabaseManager {
                     "character TEXT," +
                     "weight REAL," +
                     "height REAL," +
+                    "age INTEGER NOT NULL DEFAULT 0," +
                     "coin INTEGER NOT NULL DEFAULT 0," +
                     "hp INTEGER NOT NULL DEFAULT 100," +
                     "is_registered INTEGER NOT NULL DEFAULT 1" +
                     ")");
+
+            // 기존 스키마에 age가 없다면 추가 (이미 있으면 무시)
+            try {
+                stmt.execute("ALTER TABLE user ADD COLUMN age INTEGER NOT NULL DEFAULT 0");
+            } catch (SQLException ignored) {
+            }
 
             stmt.execute("CREATE TABLE IF NOT EXISTS exercise_log (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -63,7 +70,7 @@ public class DatabaseManager {
     }
 
     public Optional<User> loadFirstUser() {
-        String sql = "SELECT id, nickname, character, weight, height, coin, hp, is_registered FROM user ORDER BY id LIMIT 1";
+        String sql = "SELECT id, nickname, character, weight, height, age, coin, hp, is_registered FROM user ORDER BY id LIMIT 1";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
@@ -73,6 +80,7 @@ public class DatabaseManager {
                         rs.getString("character"),
                         rs.getDouble("weight"),
                         rs.getDouble("height"),
+                        rs.getInt("age"),
                         rs.getInt("coin"),
                         rs.getInt("hp"),
                         rs.getInt("is_registered") == 1
@@ -111,14 +119,15 @@ public class DatabaseManager {
         return -1;
     }
 
-    public void updateUserStats(int userId, int coins, int hp, double weight, double height) {
-        String sql = "UPDATE user SET coin = ?, hp = ?, weight = ?, height = ? WHERE id = ?";
+    public void updateUserStats(int userId, int coins, int hp, double weight, double height, int age) {
+        String sql = "UPDATE user SET coin = ?, hp = ?, weight = ?, height = ?, age = ? WHERE id = ?";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, coins);
             ps.setInt(2, hp);
             ps.setDouble(3, weight);
             ps.setDouble(4, height);
-            ps.setInt(5, userId);
+            ps.setInt(5, age);
+            ps.setInt(6, userId);
             ps.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();

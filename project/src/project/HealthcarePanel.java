@@ -81,14 +81,18 @@ class HealthcarePanel extends JPanel {
         this.userId = userId;
     }
 
-    public void applyStoredBodyInfo(double storedWeight, double storedHeight) {
+    public void applyStoredBodyInfo(double storedWeight, double storedHeight, int storedAge) {
         weight = storedWeight;
         height = storedHeight;
+        age = storedAge;
         if (weightSpinner != null) {
             weightSpinner.setValue((int) storedWeight);
         }
         if (heightSpinner != null) {
             heightSpinner.setValue((int) storedHeight);
+        }
+        if (ageSpinner != null) {
+            ageSpinner.setValue(storedAge);
         }
         refreshSummary();
     }
@@ -228,7 +232,7 @@ class HealthcarePanel extends JPanel {
 
         JOptionPane.showMessageDialog(this, "신체 정보가 저장되었습니다.\n체중: " + (int)weight + " kg, 키: " + (int)height + " cm, 나이: " + age + " 세");
         if (userId > 0 && databaseManager != null) {
-            databaseManager.updateUserStats(userId, mainPanel.getCoins(), mainPanel.getHpValue(), weight, height);
+            databaseManager.updateUserStats(userId, mainPanel.getCoins(), mainPanel.getHpValue(), weight, height, age);
         }
         refreshSummary();
     }

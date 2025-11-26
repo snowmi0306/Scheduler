@@ -69,7 +69,7 @@ public class SchedulerApp extends JFrame {
                 mainPanel.setUserContext(userId);
                 mainPanel.setUserInfo(user.nickname(), user.character());
                 mainPanel.setStats(user.coins(), user.hp());
-                healthcarePanel.applyStoredBodyInfo(user.weight(), user.height());
+                healthcarePanel.applyStoredBodyInfo(user.weight(), user.height(), user.age());
                 healthcarePanel.setUserContext(userId);
                 showCard("main");
             } else {
