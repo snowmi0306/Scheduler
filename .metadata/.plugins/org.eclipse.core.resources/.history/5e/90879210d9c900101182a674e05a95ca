@@ -1,0 +1,127 @@
+package project;
+
+import javax.swing.*;
+import javax.swing.border.*;
+import java.awt.*;
+import java.time.*;
+import java.util.*;
+
+class MainPanel extends JPanel {
+    private String nickname = "사용자";
+    private String avatarIcon = "여자1";
+
+    private JLabel avatarLabel;
+    private JLabel nameLabel;
+    private JProgressBar hpBar;
+    private JButton healthcareBtn;
+
+    private JLabel calorieLabel;
+    private Map<LocalDate, Integer> foodCalories = new HashMap<>();
+    private Map<LocalDate, Integer> exerciseCalories = new HashMap<>();
+
+    public MainPanel() {
+        setLayout(new BorderLayout(12, 12));
+        setBorder(new EmptyBorder(12, 12, 12, 12));
+
+        // 상단 캐릭터 카드
+        JPanel top = new JPanel(new BorderLayout(8, 8));
+        JPanel charCard = new JPanel(new BorderLayout());
+        charCard.setBorder(new TitledBorder("캐릭터"));
+        avatarLabel = new JLabel(avatarIcon, SwingConstants.CENTER);
+        avatarLabel.setFont(new Font("SansSerif", Font.PLAIN, 32));
+        nameLabel = new JLabel("닉네임: " + nickname, SwingConstants.CENTER);
+        nameLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+        charCard.add(avatarLabel, BorderLayout.CENTER);
+        charCard.add(nameLabel, BorderLayout.SOUTH);
+        charCard.setPreferredSize(new Dimension(220, 0));
+        top.add(charCard, BorderLayout.WEST);
+
+        // 상태 카드
+        JPanel statusCard = new JPanel();
+        statusCard.setLayout(new BoxLayout(statusCard, BoxLayout.Y_AXIS));
+        statusCard.setBorder(new TitledBorder("상태"));
+        hpBar = new JProgressBar(0, 100);
+        hpBar.setValue(100);
+        hpBar.setStringPainted(true);
+        hpBar.setForeground(Color.RED);
+        JLabel hpLabel = new JLabel("HP", SwingConstants.CENTER);
+        hpLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        statusCard.add(hpLabel);
+        statusCard.add(Box.createRigidArea(new Dimension(0, 6)));
+        statusCard.add(hpBar);
+        statusCard.setPreferredSize(new Dimension(220, 0));
+        top.add(statusCard, BorderLayout.EAST);
+
+        add(top, BorderLayout.NORTH);
+
+        // 하단 네비 + 칼로리 표시
+        JPanel bottom = new JPanel(new BorderLayout(8, 8));
+        calorieLabel = new JLabel("오늘 소모 칼로리: 0 kcal", SwingConstants.CENTER);
+        calorieLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
+        bottom.add(calorieLabel, BorderLayout.NORTH);
+
+        JPanel nav = new JPanel(new GridLayout(1, 3, 12, 12));
+        healthcareBtn = new JButton("헬스케어");
+        JButton schedulerBtn = new JButton("스케줄러");
+        JButton shopBtn = new JButton("상점");
+        nav.add(healthcareBtn);
+        nav.add(schedulerBtn);
+        nav.add(shopBtn);
+        bottom.add(nav, BorderLayout.SOUTH);
+
+        add(bottom, BorderLayout.SOUTH);
+    }
+
+    public void setUserInfo(String nickname, String avatarIcon) {
+        this.nickname = nickname;
+        this.avatarIcon = avatarIcon;
+        avatarLabel.setText(this.avatarIcon);
+        nameLabel.setText("닉네임: " + this.nickname);
+    }
+
+    public JButton getHealthcareButton() { return healthcareBtn; }
+    public String getNickname() { return nickname; }
+    public String getAvatarIcon() { return avatarIcon; }
+
+    // 음식 칼로리 기록
+    public void addFoodCalories(LocalDate date, int kcal) {
+        foodCalories.put(date, foodCalories.getOrDefault(date, 0) + kcal);
+        checkDailyBalance(date);
+    }
+
+    // 운동 칼로리 기록
+    public void addExerciseCalories(LocalDate date, int kcal) {
+        exerciseCalories.put(date, exerciseCalories.getOrDefault(date, 0) + kcal);
+        checkDailyBalance(date);
+    }
+
+    // 음식 vs BMR+운동 비교
+    private void checkDailyBalance(LocalDate date) {
+        int food = foodCalories.getOrDefault(date, 0);
+        int exercise = exerciseCalories.getOrDefault(date, 0);
+
+        boolean isMale = avatarIcon.startsWith("남자");
+        double weight = HealthcarePanel.getWeight();
+        double height = HealthcarePanel.getHeight();
+        int age = HealthcarePanel.getAge();
+
+        int bmr = calculateBMR(isMale, weight, height, age);
+        int allowed = bmr + exercise;
+
+        if (food > allowed) {
+            int excess = food - allowed;
+            int hpLoss = excess / 200 * 10;
+            hpBar.setValue(Math.max(0, hpBar.getValue() - hpLoss));
+            JOptionPane.showMessageDialog(this, "칼로리 초과! HP -" + hpLoss);
+        }
+    }
+
+    // BMR 계산 메서드 (완성본)
+    public static int calculateBMR(boolean isMale, double weight, double height, int age) {
+        if (isMale) {
+            return (int)Math.round(66.47 + (13.75 * weight) + (5 * height) - (6.76 * age));
+        } else {
+            return (int)Math.round(655.1 + (9.56 * weight) + (1.85 * height) - (4.68 * age));
+        }
+    }
+}

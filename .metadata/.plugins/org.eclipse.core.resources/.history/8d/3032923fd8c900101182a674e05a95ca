@@ -1,0 +1,49 @@
+package project;
+
+import javax.swing.*;
+import java.awt.*;
+
+public class SchedulerApp extends JFrame {
+    private CardLayout cardLayout;
+    private JPanel cards;
+    private RegistrationPanel registrationPanel;
+    private MainPanel mainPanel;
+    private HealthcarePanel healthcarePanel;
+
+    public SchedulerApp() {
+        setTitle("스케줄러 / 캐릭터");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(880, 640);
+        setLocationRelativeTo(null);
+
+        cardLayout = new CardLayout();
+        cards = new JPanel(cardLayout);
+
+        registrationPanel = new RegistrationPanel(this);
+        mainPanel = new MainPanel();
+        healthcarePanel = new HealthcarePanel();
+
+        cards.add(registrationPanel, "register");
+        cards.add(mainPanel, "main");
+        cards.add(healthcarePanel, "healthcare");
+
+        add(cards);
+        cardLayout.show(cards, "register");
+
+        // MainPanel → HealthcarePanel 이동
+        mainPanel.getHealthcareButton().addActionListener(e -> {
+            healthcarePanel.setCharacterText(mainPanel.getNickname() + " (" + mainPanel.getAvatarIcon() + ")");
+            cardLayout.show(cards, "healthcare");
+        });
+
+        // HealthcarePanel → MainPanel 이동
+        healthcarePanel.getBackButton().addActionListener(e ->
+            cardLayout.show(cards, "main")
+        );
+    }
+
+    public void showMain(String nickname, String avatarIcon) {
+        mainPanel.setUserInfo(nickname, avatarIcon);
+        cardLayout.show(cards, "main");
+    }
+}

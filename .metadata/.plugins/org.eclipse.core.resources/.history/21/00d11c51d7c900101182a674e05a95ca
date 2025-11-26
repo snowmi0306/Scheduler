@@ -1,0 +1,280 @@
+package project;
+
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import java.awt.*;
+import java.time.LocalDate;
+
+public class HealthcarePanel extends JPanel {
+    private JLabel characterLabel;
+    private JTextField weightField;
+    private JButton exerciseBtn, calorieBtn, sleepBtn;
+    private JButton backBtn;
+    private SchedulerApp parent;
+
+    public HealthcarePanel(SchedulerApp parent) {
+        this.parent = parent;
+        setLayout(new BorderLayout(12, 12));
+        setBorder(new EmptyBorder(12, 12, 12, 12));
+
+        // 상단: 제목 및 캐릭터/몸무게 영역
+        JPanel top = new JPanel(new BorderLayout(8, 8));
+        JLabel title = new JLabel("헬스케어 대시보드", SwingConstants.CENTER);
+        title.setFont(new Font("SansSerif", Font.BOLD, 22));
+        top.add(title, BorderLayout.NORTH);
+
+        JPanel info = new JPanel(new GridLayout(1, 2, 10, 10));
+        characterLabel = new JLabel("캐릭터: (미등록)", SwingConstants.CENTER);
+        characterLabel.setFont(new Font("SansSerif", Font.BOLD, 18));
+        info.add(characterLabel);
+
+        JPanel weightPanel = new JPanel(new BorderLayout(4,4));
+        weightField = new JTextField();
+        weightField.setBorder(BorderFactory.createTitledBorder("몸무게 (kg)"));
+        weightPanel.add(weightField, BorderLayout.CENTER);
+        JButton saveWeightBtn = new JButton("저장");
+        weightPanel.add(saveWeightBtn, BorderLayout.EAST);
+        info.add(weightPanel);
+
+        top.add(info, BorderLayout.CENTER);
+        add(top, BorderLayout.NORTH);
+
+        // 중간: 버튼 그리드 (운동량, 칼로리, 수면시간)
+        JPanel center = new JPanel(new GridLayout(3, 1, 12, 12));
+        exerciseBtn = new JButton("운동량");
+        calorieBtn = new JButton("칼로리");
+        sleepBtn = new JButton("수면시간");
+        center.add(exerciseBtn);
+        center.add(calorieBtn);
+        center.add(sleepBtn);
+        add(center, BorderLayout.CENTER);
+
+        // 하단: 뒤로가기
+        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER, 24, 8));
+        backBtn = new JButton("이전");
+        bottom.add(backBtn);
+        add(bottom, BorderLayout.SOUTH);
+
+        // 이벤트 연결
+        saveWeightBtn.addActionListener(e -> {
+            try {
+                double wkg = Double.parseDouble(weightField.getText().trim());
+                DBManager.updateWeight(parent.getUserId(), wkg);
+                JOptionPane.showMessageDialog(this, "체중 저장 완료!");
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "몸무게를 숫자로 입력해주세요 (예: 70.5).");
+            }
+        });
+
+        exerciseBtn.addActionListener(e -> new ExerciseInputDialog(parent));
+        calorieBtn.addActionListener(e -> new CalorieInputDialog(parent));
+        sleepBtn.addActionListener(e -> new SleepInputDialog(parent));
+    }
+
+    public void setCharacterText(String text) {
+        characterLabel.setText("캐릭터: " + text);
+    }
+
+    public JButton getBackButton() { return backBtn; }
+
+    /* ---------- 내부 다이얼로그들 ---------- */
+
+    // 1) 운동량 입력 창
+    private static class ExerciseInputDialog extends JDialog {
+        private JPanel inputArea;
+        private SchedulerApp parent;
+        public ExerciseInputDialog(SchedulerApp parent) {
+            super(parent, "운동량 입력", true);
+            this.parent = parent;
+            setSize(480, 520);
+            setLocationRelativeTo(parent);
+            setLayout(new BorderLayout(10,10));
+
+            JLabel title = new JLabel("운동량", SwingConstants.CENTER);
+            title.setFont(new Font("SansSerif", Font.BOLD, 22));
+            add(title, BorderLayout.NORTH);
+
+            inputArea = new JPanel();
+            inputArea.setLayout(new BoxLayout(inputArea, BoxLayout.Y_AXIS));
+            JScrollPane scroll = new JScrollPane(inputArea);
+            add(scroll, BorderLayout.CENTER);
+
+            addInputRow();
+
+            JPanel bottom = new JPanel(new GridLayout(1,3,10,10));
+            JButton addBtn = new JButton("추가");
+            JButton okBtn = new JButton("확인");
+            JButton closeBtn = new JButton("닫기");
+            bottom.add(addBtn);
+            bottom.add(okBtn);
+            bottom.add(closeBtn);
+            add(bottom, BorderLayout.SOUTH);
+
+            addBtn.addActionListener(e -> addInputRow());
+            closeBtn.addActionListener(e -> dispose());
+            okBtn.addActionListener(e -> {
+                for (Component c : inputArea.getComponents()) {
+                    if (c instanceof JPanel) {
+                        JTextField contentField = (JTextField)((JPanel)c).getComponent(0);
+                        JTextField timeField = (JTextField)((JPanel)c).getComponent(1);
+                        try {
+                            String content = contentField.getText().trim();
+                            int minutes = Integer.parseInt(timeField.getText().trim());
+                            DBManager.insertExercise(parent.getUserId(), LocalDate.now().toString(), content, minutes);
+                        } catch (Exception ex) { }
+                    }
+                }
+                JOptionPane.showMessageDialog(this, "운동 기록이 저장되었습니다.");
+                dispose();
+            });
+
+            setVisible(true);
+        }
+
+        private void addInputRow() {
+            JPanel row = new JPanel(new GridLayout(1,2,8,8));
+            JTextField contentField = new JTextField();
+            JTextField timeField = new JTextField();
+            contentField.setBorder(BorderFactory.createTitledBorder("내용"));
+            timeField.setBorder(BorderFactory.createTitledBorder("시간(분)"));
+            row.add(contentField);
+            row.add(timeField);
+            inputArea.add(row);
+            inputArea.revalidate();
+            inputArea.repaint();
+        }
+    }
+
+    // 2) 칼로리 입력 창
+    private static class CalorieInputDialog extends JDialog {
+        private JPanel inputArea;
+        private SchedulerApp parent;
+        public CalorieInputDialog(SchedulerApp parent) {
+            super(parent, "칼로리 입력", true);
+            this.parent = parent;
+            setSize(480, 520);
+            setLocationRelativeTo(parent);
+            setLayout(new BorderLayout(10,10));
+
+            JLabel title = new JLabel("칼로리", SwingConstants.CENTER);
+            title.setFont(new Font("SansSerif", Font.BOLD, 22));
+            add(title, BorderLayout.NORTH);
+
+            inputArea = new JPanel();
+            inputArea.setLayout(new BoxLayout(inputArea, BoxLayout.Y_AXIS));
+            JScrollPane scroll = new JScrollPane(inputArea);
+            add(scroll, BorderLayout.CENTER);
+
+            addInputRow();
+
+            JPanel bottom = new JPanel(new GridLayout(1,3,10,10));
+            JButton addBtn = new JButton("추가");
+            JButton okBtn = new JButton("확인");
+            JButton closeBtn = new JButton("닫기");
+            bottom.add(addBtn);
+            bottom.add(okBtn);
+            bottom.add(closeBtn);
+            add(bottom, BorderLayout.SOUTH);
+
+            addBtn.addActionListener(e -> addInputRow());
+            closeBtn.addActionListener(e -> dispose());
+            okBtn.addActionListener(e -> {
+                for (Component c : inputArea.getComponents()) {
+                    if (c instanceof JPanel) {
+                        JTextField foodField = (JTextField)((JPanel)c).getComponent(0);
+                        JTextField kcalField = (JTextField)((JPanel)c).getComponent(1);
+                        try {
+                            String food = foodField.getText().trim();
+                            int kcal = Integer.parseInt(kcalField.getText().trim());
+                            DBManager.insertCalorie(parent.getUserId(), LocalDate.now().toString(), food, kcal);
+                        } catch (Exception ex) { }
+                    }
+                }
+                JOptionPane.showMessageDialog(this, "칼로리 기록이 저장되었습니다.");
+                dispose();
+            });
+
+            setVisible(true);
+        }
+
+        private void addInputRow() {
+            JPanel row = new JPanel(new GridLayout(1,2,8,8));
+            JTextField foodField = new JTextField();
+            JTextField kcalField = new JTextField();
+            foodField.setBorder(BorderFactory.createTitledBorder("음식명"));
+            kcalField.setBorder(BorderFactory.createTitledBorder("칼로리(kcal)"));
+            row.add(foodField);
+            row.add(kcalField);
+            inputArea.add(row);
+            inputArea.revalidate();
+            inputArea.repaint();
+        }
+    }
+    // 3) 수면시간 입력 창
+    private static class SleepInputDialog extends JDialog {
+        private JPanel inputArea;
+        private SchedulerApp parent;
+        public SleepInputDialog(SchedulerApp parent) {
+            super(parent, "수면시간 입력", true);
+            this.parent = parent;
+            setSize(480, 420);
+            setLocationRelativeTo(parent);
+            setLayout(new BorderLayout(10,10));
+
+            JLabel title = new JLabel("수면시간", SwingConstants.CENTER);
+            title.setFont(new Font("SansSerif", Font.BOLD, 22));
+            add(title, BorderLayout.NORTH);
+
+            inputArea = new JPanel();
+            inputArea.setLayout(new BoxLayout(inputArea, BoxLayout.Y_AXIS));
+            JScrollPane scroll = new JScrollPane(inputArea);
+            add(scroll, BorderLayout.CENTER);
+
+            addInputRow();
+
+            JPanel bottom = new JPanel(new GridLayout(1,3,10,10));
+            JButton addBtn = new JButton("추가");
+            JButton okBtn = new JButton("확인");
+            JButton closeBtn = new JButton("닫기");
+            bottom.add(addBtn);
+            bottom.add(okBtn);
+            bottom.add(closeBtn);
+            add(bottom, BorderLayout.SOUTH);
+
+            addBtn.addActionListener(e -> addInputRow());
+            closeBtn.addActionListener(e -> dispose());
+            okBtn.addActionListener(e -> {
+                for (Component c : inputArea.getComponents()) {
+                    if (c instanceof JPanel) {
+                        JTextField dateField = (JTextField)((JPanel)c).getComponent(0);
+                        JTextField hourField = (JTextField)((JPanel)c).getComponent(1);
+                        try {
+                            String date = dateField.getText().trim();
+                            double hours = Double.parseDouble(hourField.getText().trim());
+                            DBManager.insertSleep(parent.getUserId(), date, hours);
+                        } catch (Exception ex) {
+                            // 잘못된 입력은 무시
+                        }
+                    }
+                }
+                JOptionPane.showMessageDialog(this, "수면 기록이 저장되었습니다.");
+                dispose();
+            });
+
+            setVisible(true);
+        }
+
+        private void addInputRow() {
+            JPanel row = new JPanel(new GridLayout(1,2,8,8));
+            JTextField dateField = new JTextField(LocalDate.now().toString());
+            JTextField hourField = new JTextField();
+            dateField.setBorder(BorderFactory.createTitledBorder("날짜 (YYYY-MM-DD)"));
+            hourField.setBorder(BorderFactory.createTitledBorder("수면시간 (시간)"));
+            row.add(dateField);
+            row.add(hourField);
+            inputArea.add(row);
+            inputArea.revalidate();
+            inputArea.repaint();
+        }
+    }
+}

@@ -1,0 +1,52 @@
+package project;
+
+import javax.swing.*;
+import java.awt.*;
+
+public class SchedulerApp extends JFrame {
+    private CardLayout cardLayout;
+    private JPanel cards;
+    private RegistrationPanel registrationPanel;
+    private MainPanel mainPanel;
+    private HealthcarePanel healthcarePanel;
+
+    public SchedulerApp() {
+        setTitle("스케줄러 / 캐릭터");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(880, 640);
+        setLocationRelativeTo(null);
+
+        cardLayout = new CardLayout();
+        cards = new JPanel(cardLayout);
+
+        registrationPanel = new RegistrationPanel(this);
+        mainPanel = new MainPanel();
+        healthcarePanel = new HealthcarePanel(this, mainPanel);
+
+        cards.add(registrationPanel, "register");
+        cards.add(mainPanel, "main");
+        cards.add(healthcarePanel, "healthcare");
+
+        add(cards);
+        cardLayout.show(cards, "register");
+
+        mainPanel.getHealthcareButton().addActionListener(e -> {
+            healthcarePanel.setCharacterText(mainPanel.getNickname() + " (" + mainPanel.getAvatarIcon() + ")");
+            showCard("healthcare");
+        });
+
+        healthcarePanel.getBackButton().addActionListener(e ->
+            showCard("main")
+        );
+    }
+
+    // 카드 전환을 위한 공개 메서드
+    public void showCard(String name) {
+        cardLayout.show(cards, name);
+    }
+
+    public void showMain(String nickname, String avatarIcon) {
+        mainPanel.setUserInfo(nickname, avatarIcon);
+        showCard("main");
+    }
+}

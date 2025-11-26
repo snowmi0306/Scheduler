@@ -1,0 +1,61 @@
+package project;
+
+import javax.swing.*;
+import java.awt.*;
+
+public class SchedulerApp extends JFrame {
+    private CardLayout cardLayout;
+    private JPanel cards;
+    private RegistrationPanel registrationPanel;
+    private MainPanel mainPanel;
+    private HealthcarePanel healthcarePanel;
+    private Shop shopPanel; // Shop 클래스 사용
+
+    public SchedulerApp() {
+        setTitle("HealthcarePanel");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(880, 640);
+        setLocationRelativeTo(null);
+
+        cardLayout = new CardLayout();
+        cards = new JPanel(cardLayout);
+
+        registrationPanel = new RegistrationPanel(this);
+        mainPanel = new MainPanel();
+        healthcarePanel = new HealthcarePanel(this, mainPanel);
+        shopPanel = new Shop(this, mainPanel); // Shop 생성
+
+        cards.add(registrationPanel, "register");
+        cards.add(mainPanel, "main");
+        cards.add(healthcarePanel, "healthcare");
+        cards.add(shopPanel, "shop");
+
+        add(cards);
+        cardLayout.show(cards, "register");
+
+        // 헬스케어 버튼 연결
+        mainPanel.getHealthcareButton().addActionListener(e -> {
+            healthcarePanel.setCharacterText(mainPanel.getNickname() + " (" + mainPanel.getAvatarIcon() + ")");
+            showCard("healthcare");
+        });
+
+        // 상점 버튼 연결 (MainPanel의 기존 상점 버튼 사용)
+        mainPanel.getShopButton().addActionListener(e -> {
+            shopPanel.refreshInfo();
+            showCard("shop");
+        });
+
+        // 뒤로가기 버튼들
+        healthcarePanel.getBackButton().addActionListener(e -> showCard("main"));
+        shopPanel.getBackButton().addActionListener(e -> showCard("main"));
+    }
+
+    public void showCard(String name) {
+        cardLayout.show(cards, name);
+    }
+
+    public void showMain(String nickname, String avatarIcon) {
+        mainPanel.setUserInfo(nickname, avatarIcon);
+        showCard("main");
+    }
+}

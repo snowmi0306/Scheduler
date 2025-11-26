@@ -1,0 +1,215 @@
+package project;
+
+import javax.swing.*;
+import javax.swing.border.*;
+import java.awt.*;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+public class MyCharacter {
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new SchedulerApp().setVisible(true));
+    }
+}
+
+class SchedulerApp extends JFrame {
+    private CardLayout cardLayout;
+    private JPanel cards;
+    private RegistrationPanel registrationPanel;
+    private MainPanel mainPanel;
+    private HealthcarePanel healthcarePanel;
+    private int userId;
+
+    public SchedulerApp() {
+        setTitle("스케줄러 / 캐릭터");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(880, 640);
+        setLocationRelativeTo(null);
+
+        cardLayout = new CardLayout();
+        cards = new JPanel(cardLayout);
+
+        registrationPanel = new RegistrationPanel(this);
+        mainPanel = new MainPanel(this);
+        healthcarePanel = new HealthcarePanel(this);
+
+        cards.add(registrationPanel, "register");
+        cards.add(mainPanel, "main");
+        cards.add(healthcarePanel, "healthcare");
+
+        add(cards);
+        cardLayout.show(cards, "register");
+
+        // MainPanel → HealthcarePanel 이동
+        mainPanel.getHealthcareButton().addActionListener(e -> {
+            healthcarePanel.setCharacterText(mainPanel.getNickname() + " " + mainPanel.getAvatarIcon());
+            cardLayout.show(cards, "healthcare");
+        });
+
+        // HealthcarePanel → MainPanel 이동
+        healthcarePanel.getBackButton().addActionListener(e -> cardLayout.show(cards, "main"));
+    }
+
+    public void showMain(String nickname, String avatarIcon) {
+        userId = DBManager.insertUser(nickname, avatarIcon);
+        mainPanel.setUserInfo(nickname, avatarIcon);
+        cardLayout.show(cards, "main");
+    }
+
+    public int getUserId() { return userId; }
+}
+
+class RegistrationPanel extends JPanel {
+    private SchedulerApp parent;
+    private JComboBox<String> avatarCombo;
+    private JTextField nameField;
+
+    public RegistrationPanel(SchedulerApp parent) {
+        this.parent = parent;
+        setLayout(new BorderLayout(10, 10));
+        setBorder(new EmptyBorder(40, 80, 40, 80));
+
+        JLabel title = new JLabel("캐릭터 생성", SwingConstants.CENTER);
+        title.setFont(new Font("SansSerif", Font.BOLD, 26));
+        add(title, BorderLayout.NORTH);
+
+        JPanel center = new JPanel(new BorderLayout(10, 10));
+        JLabel preview = new JLabel("🌞", SwingConstants.CENTER);
+        preview.setFont(new Font("SansSerif", Font.PLAIN, 48));
+        preview.setBorder(new LineBorder(Color.LIGHT_GRAY, 1));
+        preview.setPreferredSize(new Dimension(180, 180));
+        center.add(preview, BorderLayout.WEST);
+
+        JPanel form = new JPanel(new GridLayout(4, 1, 8, 8));
+        form.setBorder(new EmptyBorder(10, 20, 10, 20));
+        avatarCombo = new JComboBox<>(new String[]{"🌞 해님", "🌙 달님", "⭐ 별님", "🐶 강아지", "🐱 고양이"});
+        nameField = new JTextField();
+
+        avatarCombo.addActionListener(e -> {
+            String sel = (String) avatarCombo.getSelectedItem();
+            preview.setText(sel.split(" ")[0]);
+        });
+
+        form.add(new JLabel("아바타 선택"));
+        form.add(avatarCombo);
+        form.add(new JLabel("닉네임 입력"));
+        form.add(nameField);
+
+        center.add(form, BorderLayout.CENTER);
+        add(center, BorderLayout.CENTER);
+
+        JButton createBtn = new JButton("등록 완료");
+        createBtn.setFont(new Font("SansSerif", Font.BOLD, 14));
+        createBtn.addActionListener(e -> {
+            String name = nameField.getText().trim();
+            String avatar = (String) avatarCombo.getSelectedItem();
+            if (name.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "닉네임을 입력해주세요.");
+                return;
+            }
+            parent.showMain(name, avatar);
+        });
+        add(createBtn, BorderLayout.SOUTH);
+    }
+}
+
+class MainPanel extends JPanel {
+    private String nickname = "사용자";
+    private String avatarIcon = "🌞";
+    private JLabel avatarLabel;
+    private JLabel nameLabel;
+    private JProgressBar hpBar;
+    private JLabel dateLabel;
+    private JLabel timeLabel;
+    private JComboBox<LocalDate> dateSelector;
+    private DefaultListModel<String> scheduleModel;
+    private JList<String> scheduleList;
+    private Map<LocalDate, TreeMap<LocalTime, String>> scheduleStore = new HashMap<>();
+    private JTextField timeInput;
+    private JTextField taskInput;
+    private JPanel regCard;
+    private JButton healthcareBtn;
+    private SchedulerApp parent;
+
+    public MainPanel(SchedulerApp parent) {
+        this.parent = parent;
+        setLayout(new BorderLayout(12, 12));
+        setBorder(new EmptyBorder(12, 12, 12, 12));
+
+        // 캐릭터 카드
+        JPanel charCard = new JPanel(new BorderLayout());
+        charCard.setBorder(new TitledBorder("캐릭터"));
+        avatarLabel = new JLabel(avatarIcon, SwingConstants.CENTER);
+        avatarLabel.setFont(new Font("SansSerif", Font.PLAIN, 48));
+        nameLabel = new JLabel("닉네임: " + nickname, SwingConstants.CENTER);
+        charCard.add(avatarLabel, BorderLayout.CENTER);
+        charCard.add(nameLabel, BorderLayout.SOUTH);
+
+        // HP 상태
+        hpBar = new JProgressBar(0, 100);
+        hpBar.setValue(100);
+        hpBar.setStringPainted(true);
+
+        // 날짜/시간
+        dateLabel = new JLabel("날짜: " + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")), SwingConstants.CENTER);
+        timeLabel = new JLabel("시간: " + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")), SwingConstants.CENTER);
+
+        JPanel top = new JPanel(new GridLayout(1,3));
+        top.add(charCard);
+        top.add(dateLabel);
+        top.add(hpBar);
+        add(top, BorderLayout.NORTH);
+
+        // 일정 목록
+        scheduleModel = new DefaultListModel<>();
+        scheduleList = new JList<>(scheduleModel);
+        add(new JScrollPane(scheduleList), BorderLayout.CENTER);
+
+        // 하단 네비게이션
+        healthcareBtn = new JButton("헬스케어");
+        JButton schedulerBtn = new JButton("스케줄러");
+        JButton shopBtn = new JButton("상점");
+        JPanel nav = new JPanel(new GridLayout(1,3));
+        nav.add(healthcareBtn);
+        nav.add(schedulerBtn);
+        nav.add(shopBtn);
+        add(nav, BorderLayout.SOUTH);
+
+        // 완료/실패 버튼 HP 반영
+        JButton completeBtn = new JButton("✅ 완료");
+        JButton failBtn = new JButton("❌ 실패");
+        JPanel actionPanel = new JPanel();
+        actionPanel.add(completeBtn);
+        actionPanel.add(failBtn);
+        add(actionPanel, BorderLayout.EAST);
+
+        completeBtn.addActionListener(e -> {
+            hpBar.setValue(Math.min(100, hpBar.getValue() + 10));
+            DBManager.updateHP(parent.getUserId(), hpBar.getValue());
+        });
+
+        failBtn.addActionListener(e -> {
+            hpBar.setValue(Math.max(0, hpBar.getValue() - 10));
+            DBManager.updateHP(parent.getUserId(), hpBar.getValue());
+        });
+
+        // 시계 타이머
+        new javax.swing.Timer(1000, e -> {
+            timeLabel.setText("시간: " + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+            dateLabel.setText("날짜: " + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        }).start();
+    }
+
+    public void setUserInfo(String nickname, String avatarIcon) {
+        this.nickname = nickname;
+        this.avatarIcon = avatarIcon.split(" ")[0];
+        avatarLabel.setText(this.avatarIcon);
+        nameLabel.setText("닉네임: " + this.nickname);
+    }
+
+    public JButton getHealthcareButton() { return healthcareBtn; }
+    public String getNickname() { return nickname; }
+    public String getAvatarIcon() { return avatarIcon; }
+}
+

@@ -1,0 +1,407 @@
+package project;
+
+import javax.swing.*;
+import javax.swing.border.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+class MainPanel extends JPanel {
+    private String nickname = "사용자";
+    private String avatarIcon = "여자1";
+
+    private JLabel avatarLabel;
+    private JLabel nameLabel;
+    private JProgressBar hpBar;
+    private JLabel dateLabel;
+    private JLabel timeLabel;
+    private JLabel coinLabel; // 코인 잔액 표시
+    private JComboBox<LocalDate> dateSelector;
+
+    private DefaultListModel<String> scheduleModel;
+    private JList<String> scheduleList;
+    private Map<LocalDate, TreeMap<LocalTime, String>> scheduleStore = new HashMap<>();
+
+    private DefaultListModel<String> healthModel;
+    private JList<String> healthList;
+    private Map<LocalDate, String> healthStore = new HashMap<>();
+
+    private JTextField timeInput;
+    private JTextField taskInput;
+    private JPanel regCard;
+
+    private JButton healthcareBtn;
+
+    private Map<LocalDate, Integer> foodCalories = new HashMap<>();
+    private Map<LocalDate, Integer> exerciseCalories = new HashMap<>();
+    private Map<LocalDate, Integer> sleepHours = new HashMap<>();
+
+    // 코인 관련
+    private int coins = 0;
+    private LocalDate lastCalorieRewardDate = null; // 칼로리 보상 지급한 날짜 기록
+
+    public MainPanel() {
+        setLayout(new BorderLayout(12, 12));
+        setBorder(new EmptyBorder(12, 12, 12, 12));
+
+        // 상단: 캐릭터, 날짜/시간, HP, 코인
+        JPanel top = new JPanel(new BorderLayout(8, 8));
+        top.setPreferredSize(new Dimension(0, 120));
+
+        JPanel charCard = new JPanel(new BorderLayout());
+        charCard.setBorder(new TitledBorder("캐릭터"));
+        avatarLabel = new JLabel(avatarIcon, SwingConstants.CENTER);
+        avatarLabel.setFont(new Font("SansSerif", Font.PLAIN, 32));
+        nameLabel = new JLabel("닉네임: " + nickname, SwingConstants.CENTER);
+        nameLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+        charCard.add(avatarLabel, BorderLayout.CENTER);
+        charCard.add(nameLabel, BorderLayout.SOUTH);
+        charCard.setPreferredSize(new Dimension(220, 0));
+        top.add(charCard, BorderLayout.WEST);
+
+        JPanel centerCard = new JPanel(new BorderLayout(6, 6));
+        centerCard.setBorder(new TitledBorder("날짜 및 시간"));
+        JPanel dtPanel = new JPanel(new GridLayout(2, 1));
+        dateLabel = new JLabel("날짜: " + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")), SwingConstants.CENTER);
+        dateLabel.setFont(new Font("SansSerif", Font.PLAIN, 16));
+        timeLabel = new JLabel("시간: " + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")), SwingConstants.CENTER);
+        timeLabel.setFont(new Font("SansSerif", Font.PLAIN, 16));
+        dtPanel.add(dateLabel);
+        dtPanel.add(timeLabel);
+        centerCard.add(dtPanel, BorderLayout.CENTER);
+
+        LocalDate today = LocalDate.now();
+        dateSelector = new JComboBox<>();
+        for (int i = -30; i <= 30; i++) {
+            dateSelector.addItem(today.plusDays(i));
+        }
+        dateSelector.setSelectedItem(today);
+        dateSelector.addActionListener(e -> {
+            loadSchedulesForSelectedDate();
+            loadHealthForSelectedDate();
+        });
+        JPanel selPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        selPanel.add(new JLabel("날짜 선택:"));
+        selPanel.add(dateSelector);
+        centerCard.add(selPanel, BorderLayout.SOUTH);
+
+        top.add(centerCard, BorderLayout.CENTER);
+
+        JPanel statusCard = new JPanel();
+        statusCard.setLayout(new BoxLayout(statusCard, BoxLayout.Y_AXIS));
+        statusCard.setBorder(new TitledBorder("상태"));
+        hpBar = new JProgressBar(0, 100);
+        hpBar.setValue(100);
+        hpBar.setStringPainted(true);
+        hpBar.setForeground(Color.RED);
+        JLabel hpLabel = new JLabel("HP", SwingConstants.CENTER);
+        hpLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        statusCard.add(hpLabel);
+        statusCard.add(Box.createRigidArea(new Dimension(0, 6)));
+        statusCard.add(hpBar);
+
+        // 코인 레이블 추가
+        coinLabel = new JLabel("Coins: " + coins, SwingConstants.CENTER);
+        coinLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+        coinLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        statusCard.add(Box.createRigidArea(new Dimension(0, 6)));
+        statusCard.add(coinLabel);
+
+        statusCard.setPreferredSize(new Dimension(220, 0));
+        top.add(statusCard, BorderLayout.EAST);
+
+        add(top, BorderLayout.NORTH);
+
+        // 중앙: 일정 목록 + 버튼
+        JPanel center = new JPanel(new BorderLayout(8, 8));
+        scheduleModel = new DefaultListModel<>();
+        scheduleList = new JList<>(scheduleModel);
+        scheduleList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        scheduleList.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        JScrollPane scroll = new JScrollPane(scheduleList);
+        scroll.setBorder(new TitledBorder("일정 목록"));
+        center.add(scroll, BorderLayout.CENTER);
+
+        JPanel actionPanel = new JPanel();
+        actionPanel.setLayout(new BoxLayout(actionPanel, BoxLayout.Y_AXIS));
+        actionPanel.setBorder(new EmptyBorder(6, 6, 6, 6));
+        JButton completeBtn = new JButton("완료");
+        JButton failBtn = new JButton("실패");
+        JButton deleteBtn = new JButton("삭제");
+        completeBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        failBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        deleteBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        actionPanel.add(Box.createVerticalGlue());
+        actionPanel.add(completeBtn);
+        actionPanel.add(Box.createRigidArea(new Dimension(0, 8)));
+        actionPanel.add(failBtn);
+        actionPanel.add(Box.createRigidArea(new Dimension(0, 8)));
+        actionPanel.add(deleteBtn);
+        actionPanel.add(Box.createVerticalGlue());
+        center.add(actionPanel, BorderLayout.EAST);
+
+        add(center, BorderLayout.CENTER);
+
+        // 하단: 건강 기록 + 일정 등록 + 네비게이션
+        JPanel bottom = new JPanel(new BorderLayout(8, 8));
+
+        healthModel = new DefaultListModel<>();
+        healthList = new JList<>(healthModel);
+        healthList.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        JScrollPane healthScroll = new JScrollPane(healthList);
+        healthScroll.setBorder(new TitledBorder("건강 기록"));
+        bottom.add(healthScroll, BorderLayout.NORTH);
+
+        regCard = new JPanel(new BorderLayout(6, 6));
+        regCard.setBorder(new TitledBorder("일정 등록"));
+        regCard.setVisible(false);
+        JPanel fields = new JPanel(new GridLayout(2, 2, 6, 6));
+        fields.add(new JLabel("시간 (HH:mm):"));
+        timeInput = new JTextField();
+        fields.add(timeInput);
+        fields.add(new JLabel("내용:"));
+        taskInput = new JTextField();
+        fields.add(taskInput);
+        regCard.add(fields, BorderLayout.CENTER);
+        JButton addBtn = new JButton("등록");
+        regCard.add(addBtn, BorderLayout.EAST);
+        bottom.add(regCard, BorderLayout.CENTER);
+
+        JPanel nav = new JPanel(new GridLayout(1, 3, 12, 12));
+        nav.setBorder(new EmptyBorder(6, 6, 6, 6));
+        healthcareBtn = new JButton("헬스케어");
+        JButton schedulerBtn = new JButton("스케줄러");
+        JButton shopBtn = new JButton("상점");
+        nav.add(healthcareBtn);
+        nav.add(schedulerBtn);
+        nav.add(shopBtn);
+        bottom.add(nav, BorderLayout.SOUTH);
+
+        add(bottom, BorderLayout.SOUTH);
+
+        // 일정 등록 이벤트
+        addBtn.addActionListener(e -> {
+            LocalDate selectedDate = (LocalDate) dateSelector.getSelectedItem();
+            String t = timeInput.getText().trim();
+            String task = taskInput.getText().trim();
+            if (t.isEmpty() || task.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "시간과 내용을 모두 입력해주세요.");
+                return;
+            }
+            try {
+                LocalTime lt = LocalTime.parse(t, DateTimeFormatter.ofPattern("HH:mm"));
+                scheduleStore.putIfAbsent(selectedDate, new TreeMap<>());
+                scheduleStore.get(selectedDate).put(lt, task + " [미완료]");
+                loadSchedulesForSelectedDate();
+                timeInput.setText("");
+                taskInput.setText("");
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "시간 형식이 올바르지 않습니다. 예: 14:00");
+            }
+        });
+
+        // 완료 버튼 이벤트: 완료로 변경하고 코인 지급
+        completeBtn.addActionListener(e -> {
+            int sel = scheduleList.getSelectedIndex();
+            if (sel == -1) return;
+            String item = scheduleModel.get(sel);
+            String timeStr = item.substring(0, 5);
+            LocalTime lt = LocalTime.parse(timeStr, DateTimeFormatter.ofPattern("HH:mm"));
+            LocalDate selectedDate = (LocalDate) dateSelector.getSelectedItem();
+            TreeMap<LocalTime, String> map = scheduleStore.get(selectedDate);
+            if (map != null) {
+                String content = map.get(lt);
+                if (content != null && content.contains("미완료")) {
+                    map.put(lt, content.replace("미완료", "완료"));
+                    // 일정 완료 보상: 10 코인 (중복 지급 방지: 이미 완료면 지급하지 않음)
+                    awardCoins(10);
+                    loadSchedulesForSelectedDate();
+                }
+            }
+        });
+
+        // 실패 버튼 이벤트
+        failBtn.addActionListener(e -> {
+            int sel = scheduleList.getSelectedIndex();
+            if (sel == -1) return;
+            String item = scheduleModel.get(sel);
+            String timeStr = item.substring(0, 5);
+            LocalTime lt = LocalTime.parse(timeStr, DateTimeFormatter.ofPattern("HH:mm"));
+            LocalDate selectedDate = (LocalDate) dateSelector.getSelectedItem();
+            TreeMap<LocalTime, String> map = scheduleStore.get(selectedDate);
+            if (map != null && map.containsKey(lt)) {
+                String content = map.get(lt);
+                if (!content.contains("실패")) {
+                    map.put(lt, content.replace("미완료", "실패").replace("완료", "실패"));
+                    hpBar.setValue(Math.max(0, hpBar.getValue() - 15));
+                    loadSchedulesForSelectedDate();
+                }
+            }
+        });
+
+        // 삭제 버튼 이벤트
+        deleteBtn.addActionListener(e -> {
+            int sel = scheduleList.getSelectedIndex();
+            if (sel == -1) return;
+            int confirm = JOptionPane.showConfirmDialog(this, "선택한 일정을 삭제하시겠습니까?", "일정 삭제", JOptionPane.YES_NO_OPTION);
+            if (confirm != JOptionPane.YES_OPTION) return;
+            String item = scheduleModel.get(sel);
+            String timeStr = item.substring(0, 5);
+            LocalTime lt = LocalTime.parse(timeStr, DateTimeFormatter.ofPattern("HH:mm"));
+            LocalDate selectedDate = (LocalDate) dateSelector.getSelectedItem();
+            TreeMap<LocalTime, String> map = scheduleStore.get(selectedDate);
+            if (map != null && map.containsKey(lt)) {
+                map.remove(lt);
+                loadSchedulesForSelectedDate();
+            }
+        });
+
+        // 스케줄러 버튼: 등록 카드 토글
+        schedulerBtn.addActionListener(e -> regCard.setVisible(!regCard.isVisible()));
+        shopBtn.addActionListener(e -> JOptionPane.showMessageDialog(this, "상점으로 이동합니다."));
+
+        // 시간 라벨 갱신 타이머 및 23:59 체크 타이머 설정
+        new javax.swing.Timer(1000, e -> {
+            LocalTime now = LocalTime.now();
+            timeLabel.setText("시간: " + now.format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+            dateLabel.setText("날짜: " + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+
+            // 매 분마다 23:59인지 확인 (정확히 23:59:00 이후 한 번만 처리되도록)
+            if (now.getHour() == 23 && now.getMinute() == 59 && now.getSecond() == 0) {
+                processDailyCalorieReward();
+            }
+        }).start();
+
+        loadSchedulesForSelectedDate();
+        loadHealthForSelectedDate();
+    }
+
+    // 코인 지급 공통 메서드
+    private void awardCoins(int amount) {
+        if (amount <= 0) return;
+        coins += amount;
+        coinLabel.setText("Coins: " + coins);
+        // 간단한 피드백
+        JOptionPane.showMessageDialog(this, amount + " 코인이 지급되었습니다. 현재 코인: " + coins);
+    }
+
+    // 23:59 기준으로 하루 칼로리 보상 처리
+    private void processDailyCalorieReward() {
+        LocalDate today = LocalDate.now();
+        // 이미 지급한 날짜면 스킵
+        if (today.equals(lastCalorieRewardDate)) return;
+
+        int food = foodCalories.getOrDefault(today, 0);
+        int exercise = exerciseCalories.getOrDefault(today, 0);
+
+        boolean isMale = avatarIcon.startsWith("남자");
+        double weight = HealthcarePanel.getWeight();
+        double height = HealthcarePanel.getUserHeight();
+        int age = HealthcarePanel.getAge();
+
+        int bmr = calculateBMR(isMale, weight, height, age);
+        int allowed = bmr + exercise;
+
+        // 섭취 칼로리가 허용 칼로리보다 작거나 같으면 50 코인 지급
+        if (food <= allowed) {
+            awardCoins(50);
+            lastCalorieRewardDate = today;
+        }
+    }
+
+    public void setUserInfo(String nickname, String avatarIcon) {
+        this.nickname = nickname;
+        this.avatarIcon = avatarIcon;
+        avatarLabel.setText(this.avatarIcon);
+        nameLabel.setText("닉네임: " + this.nickname);
+    }
+
+    private void loadSchedulesForSelectedDate() {
+        LocalDate selectedDate = (LocalDate) dateSelector.getSelectedItem();
+        scheduleModel.clear();
+        TreeMap<LocalTime, String> map = scheduleStore.getOrDefault(selectedDate, new TreeMap<>());
+        for (Map.Entry<LocalTime, String> e : map.entrySet()) {
+            scheduleModel.addElement(e.getKey().format(DateTimeFormatter.ofPattern("HH:mm")) + " - " + e.getValue());
+        }
+    }
+
+    private void loadHealthForSelectedDate() {
+        LocalDate selectedDate = (LocalDate) dateSelector.getSelectedItem();
+        healthModel.clear();
+        String summary = healthStore.getOrDefault(selectedDate, "기록 없음");
+        healthModel.addElement(summary);
+    }
+
+    // 헬스케어 관련 메서드
+    public JButton getHealthcareButton() { return healthcareBtn; }
+    public String getNickname() { return nickname; }
+    public String getAvatarIcon() { return avatarIcon; }
+
+    public void addFoodCalories(LocalDate date, int kcal) {
+        foodCalories.put(date, foodCalories.getOrDefault(date, 0) + kcal);
+        updateHealthStore(date);
+        checkDailyBalance(date);
+    }
+
+    public void addExerciseCalories(LocalDate date, int kcal) {
+        exerciseCalories.put(date, exerciseCalories.getOrDefault(date, 0) + kcal);
+        updateHealthStore(date);
+        checkDailyBalance(date);
+    }
+
+    public void addSleepHours(LocalDate date, int hours) {
+        sleepHours.put(date, sleepHours.getOrDefault(date, 0) + hours);
+        updateHealthStore(date);
+    }
+
+    // 캡슐화 유지: 외부에서 맵을 직접 참조하지 않도록 getter 제공
+    public int getFoodCaloriesForDate(LocalDate date) {
+        return foodCalories.getOrDefault(date, 0);
+    }
+
+    public int getExerciseCaloriesForDate(LocalDate date) {
+        return exerciseCalories.getOrDefault(date, 0);
+    }
+
+    public int getSleepHoursForDate(LocalDate date) {
+        return sleepHours.getOrDefault(date, 0);
+    }
+
+    private void updateHealthStore(LocalDate date) {
+        int food = foodCalories.getOrDefault(date, 0);
+        int exercise = exerciseCalories.getOrDefault(date, 0);
+        int sleep = sleepHours.getOrDefault(date, 0);
+        String summary = "음식: " + food + " kcal, 운동: " + exercise + " kcal, 수면: " + sleep + " 시간";
+        healthStore.put(date, summary);
+        loadHealthForSelectedDate();
+    }
+
+    private void checkDailyBalance(LocalDate date) {
+        int food = foodCalories.getOrDefault(date, 0);
+        int exercise = exerciseCalories.getOrDefault(date, 0);
+
+        boolean isMale = avatarIcon.startsWith("남자");
+        double weight = HealthcarePanel.getWeight();
+        double height = HealthcarePanel.getUserHeight();
+        int age = HealthcarePanel.getAge();
+
+        int bmr = calculateBMR(isMale, weight, height, age);
+        int allowed = bmr + exercise;
+
+        if (food > allowed) {
+            int hpLoss = 10;
+            hpBar.setValue(Math.max(0, hpBar.getValue() - hpLoss));
+            JOptionPane.showMessageDialog(this, "칼로리 초과! HP -" + hpLoss);
+        }
+    }
+
+    public static int calculateBMR(boolean isMale, double weight, double height, int age) {
+        if (isMale) {
+            return (int)Math.round(66.47 + (13.75 * weight) + (5 * height) - (6.76 * age));
+        } else {
+            return (int)Math.round(655.1 + (9.56 * weight) + (1.85 * height) - (4.68 * age));
+        }
+    }
+}

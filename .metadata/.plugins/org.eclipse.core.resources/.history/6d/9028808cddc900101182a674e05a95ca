@@ -1,0 +1,116 @@
+package project;
+
+import javax.swing.*;
+import javax.swing.border.*;
+import java.awt.*;
+import java.time.LocalDate;
+
+class HealthcarePanel extends JPanel {
+    private SchedulerApp parent;
+    private MainPanel mainPanel;
+
+    private JTextField foodField;
+    private JTextField exerciseField;
+    private JTextField sleepField;
+
+    private JButton backBtn;
+    private JLabel characterLabel;
+
+    // 기본 신체 정보 (예시)
+    private static double weight = 70;
+    private static double height = 175;
+    private static int age = 25;
+
+    public HealthcarePanel(SchedulerApp parent, MainPanel mainPanel) {
+        this.parent = parent;
+        this.mainPanel = mainPanel;
+
+        setLayout(new BorderLayout(12, 12));
+        setBorder(new EmptyBorder(20, 20, 20, 20));
+
+        JLabel title = new JLabel("헬스케어 관리", SwingConstants.CENTER);
+        title.setFont(new Font("SansSerif", Font.BOLD, 22));
+        add(title, BorderLayout.NORTH);
+
+        JPanel center = new JPanel(new GridLayout(3, 3, 12, 12));
+        center.setBorder(new TitledBorder("입력"));
+
+        // 캐릭터 정보 표시
+        characterLabel = new JLabel("", SwingConstants.CENTER);
+        characterLabel.setFont(new Font("SansSerif", Font.PLAIN, 16));
+        add(characterLabel, BorderLayout.WEST);
+
+        // 음식 칼로리 입력
+        center.add(new JLabel("음식 칼로리 (kcal):"));
+        foodField = new JTextField();
+        center.add(foodField);
+        JButton foodBtn = new JButton("입력");
+        center.add(foodBtn);
+
+        // 운동 칼로리 입력
+        center.add(new JLabel("운동 칼로리 (kcal):"));
+        exerciseField = new JTextField();
+        center.add(exerciseField);
+        JButton exerciseBtn = new JButton("입력");
+        center.add(exerciseBtn);
+
+        // 수면 입력
+        center.add(new JLabel("수면 시간 (시간):"));
+        sleepField = new JTextField();
+        center.add(sleepField);
+        JButton sleepBtn = new JButton("입력");
+        center.add(sleepBtn);
+
+        add(center, BorderLayout.CENTER);
+
+        backBtn = new JButton("뒤로가기");
+        add(backBtn, BorderLayout.SOUTH);
+
+        // 음식 입력 이벤트
+        foodBtn.addActionListener(e -> {
+            try {
+                int kcal = Integer.parseInt(foodField.getText().trim());
+                mainPanel.addFoodCalories(LocalDate.now(), kcal);
+                JOptionPane.showMessageDialog(this, "음식 칼로리 입력 완료!");
+                foodField.setText("");
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "숫자를 입력해주세요.");
+            }
+        });
+
+        // 운동 입력 이벤트
+        exerciseBtn.addActionListener(e -> {
+            try {
+                int kcal = Integer.parseInt(exerciseField.getText().trim());
+                mainPanel.addExerciseCalories(LocalDate.now(), kcal);
+                JOptionPane.showMessageDialog(this, "운동 칼로리 입력 완료!");
+                exerciseField.setText("");
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "숫자를 입력해주세요.");
+            }
+        });
+
+        // 수면 입력 이벤트
+        sleepBtn.addActionListener(e -> {
+            try {
+                int hours = Integer.parseInt(sleepField.getText().trim());
+                mainPanel.addSleepHours(LocalDate.now(), hours);
+                JOptionPane.showMessageDialog(this, "수면 입력 완료!");
+                sleepField.setText("");
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "숫자를 입력해주세요.");
+            }
+        });
+    }
+
+    public JButton getBackButton() { return backBtn; }
+
+    public void setCharacterText(String text) {
+        characterLabel.setText("캐릭터: " + text);
+    }
+
+    // 기본 신체 정보 getter
+    public static double getWeight() { return weight; }
+    public static double getHeight() { return height; }
+    public static int getAge() { return age; }
+}

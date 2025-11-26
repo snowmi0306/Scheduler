@@ -1,0 +1,109 @@
+package project;
+
+import java.sql.*;
+
+public class DBManager {
+    private static final String DB_URL = "health_scheduler.sql";
+
+    // 드라이버 로드 (정적 초기화 블록)
+    static {
+        try {
+            Class.forName("org.sqlite.JDBC"); // SQLite JDBC 드라이버 로드
+            System.out.println("SQLite JDBC Driver Loaded");
+        } catch (ClassNotFoundException e) {
+            System.err.println("SQLite JDBC Driver not found!");
+            e.printStackTrace();
+        }
+    }
+
+    // DB 연결 반환
+    public static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(DB_URL);
+    }
+
+    // 유저 등록
+    public static int insertUser(String nickname, String character) {
+        String sql = "INSERT INTO user(nickname, character, hp, coin) VALUES(?,?,100,0)";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, nickname);
+            ps.setString(2, character);
+            ps.executeUpdate();
+            ResultSet rs = ps.getGeneratedKeys();
+            if (rs.next()) return rs.getInt(1);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    // 몸무게 업데이트
+    public static void updateWeight(int userId, double weight) {
+        String sql = "UPDATE user SET weight=? WHERE id=?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setDouble(1, weight);
+            ps.setInt(2, userId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // HP 업데이트
+    public static void updateHP(int userId, int hp) {
+        String sql = "UPDATE user SET hp=? WHERE id=?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, hp);
+            ps.setInt(2, userId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // 운동 기록 추가
+    public static void insertExercise(int userId, String date, String content, int minutes) {
+        String sql = "INSERT INTO exercise_log(user_id,date,content,minutes) VALUES(?,?,?,?)";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setString(2, date);
+            ps.setString(3, content);
+            ps.setInt(4, minutes);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // 칼로리 기록 추가
+    public static void insertCalorie(int userId, String date, String food, int kcal) {
+        String sql = "INSERT INTO calorie_log(user_id,date,food,kcal) VALUES(?,?,?,?)";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setString(2, date);
+            ps.setString(3, food);
+            ps.setInt(4, kcal);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // 수면 기록 추가
+    public static void insertSleep(int userId, String date, double hours) {
+        String sql = "INSERT INTO sleep_log(user_id,date,hours) VALUES(?,?,?)";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setString(2, date);
+            ps.setDouble(3, hours);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
