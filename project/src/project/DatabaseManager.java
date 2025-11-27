@@ -2,6 +2,9 @@ package project;
 
 import java.sql.*;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -64,6 +67,16 @@ public class DatabaseManager {
                     "user_id INTEGER NOT NULL," +
                     "date TEXT NOT NULL," +
                     "hours REAL NOT NULL," +
+                    "FOREIGN KEY (user_id) REFERENCES user(id)" +
+                    ")");
+
+            stmt.execute("CREATE TABLE IF NOT EXISTS schedule (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "user_id INTEGER NOT NULL," +
+                    "date TEXT NOT NULL," +
+                    "time TEXT NOT NULL," +
+                    "content TEXT NOT NULL," +
+                    "status TEXT NOT NULL DEFAULT '미완료'," +
                     "FOREIGN KEY (user_id) REFERENCES user(id)" +
                     ")");
         }
@@ -171,4 +184,67 @@ public class DatabaseManager {
             e.printStackTrace();
         }
     }
+
+    public int insertSchedule(int userId, LocalDate date, LocalTime time, String content, String status) {
+        String sql = "INSERT INTO schedule (user_id, date, time, content, status) VALUES (?, ?, ?, ?, ?)";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setInt(1, userId);
+            ps.setString(2, date.toString());
+            ps.setString(3, time.toString());
+            ps.setString(4, content);
+            ps.setString(5, status);
+            ps.executeUpdate();
+            ResultSet keys = ps.getGeneratedKeys();
+            if (keys.next()) {
+                return keys.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    public void updateScheduleStatus(int scheduleId, String status) {
+        String sql = "UPDATE schedule SET status = ? WHERE id = ?";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, status);
+            ps.setInt(2, scheduleId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void deleteSchedule(int scheduleId) {
+        String sql = "DELETE FROM schedule WHERE id = ?";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, scheduleId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public List<ScheduleRow> loadAllSchedules(int userId) {
+        String sql = "SELECT id, date, time, content, status FROM schedule WHERE user_id = ?";
+        List<ScheduleRow> rows = new ArrayList<>();
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                rows.add(new ScheduleRow(
+                        rs.getInt("id"),
+                        LocalDate.parse(rs.getString("date")),
+                        LocalTime.parse(rs.getString("time")),
+                        rs.getString("content"),
+                        rs.getString("status")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return rows;
+    }
+
+    public record ScheduleRow(int id, LocalDate date, LocalTime time, String content, String status) {}
 }

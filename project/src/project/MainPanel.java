@@ -26,7 +26,7 @@ class MainPanel extends JPanel {
     // 일정 데이터/UI
     private DefaultListModel<String> scheduleModel;
     private JList<String> scheduleList;
-    private Map<LocalDate, TreeMap<LocalTime, String>> scheduleStore = new HashMap<>();
+    private Map<LocalDate, List<ScheduleEntry>> scheduleStore = new HashMap<>();
 
     // 건강 기록 데이터/UI
     private DefaultListModel<String> healthModel;
@@ -210,8 +210,13 @@ class MainPanel extends JPanel {
 
             try {
                 LocalTime lt = LocalTime.parse(t, DateTimeFormatter.ofPattern("HH:mm"));
-                scheduleStore.putIfAbsent(selectedDate, new TreeMap<>());
-                scheduleStore.get(selectedDate).put(lt, task + " [미완료]");
+                scheduleStore.putIfAbsent(selectedDate, new ArrayList<>());
+                int scheduleId = -1;
+                if (userId > 0) {
+                    scheduleId = databaseManager.insertSchedule(userId, selectedDate, lt, task, ScheduleStatus.TODO.label);
+                }
+                scheduleStore.get(selectedDate).add(new ScheduleEntry(scheduleId, lt, task, ScheduleStatus.TODO));
+                ensureScheduleOrder(selectedDate);
                 loadSchedulesForSelectedDate();
                 timeInput.setText("");
                 taskInput.setText("");
@@ -224,23 +229,17 @@ class MainPanel extends JPanel {
         completeBtn.addActionListener(e -> {
             int sel = scheduleList.getSelectedIndex();
             if (sel == -1) return;
-            String item = scheduleModel.get(sel);
-            if (item.length() < 5) return;
-            String timeStr = item.substring(0, 5);
-            try {
-                LocalTime lt = LocalTime.parse(timeStr, DateTimeFormatter.ofPattern("HH:mm"));
-                LocalDate selectedDate = (LocalDate) dateSelector.getSelectedItem();
-                TreeMap<LocalTime, String> map = scheduleStore.get(selectedDate);
-                if (map != null) {
-                    String content = map.get(lt);
-                    if (content != null && content.contains("미완료")) {
-                        map.put(lt, content.replace("미완료", "완료"));
-                        awardCoins(10);
-                        loadSchedulesForSelectedDate();
-                    }
+            LocalDate selectedDate = (LocalDate) dateSelector.getSelectedItem();
+            List<ScheduleEntry> list = scheduleStore.get(selectedDate);
+            if (list == null || sel >= list.size()) return;
+            ScheduleEntry entry = list.get(sel);
+            if (entry.status != ScheduleStatus.DONE) {
+                entry.status = ScheduleStatus.DONE;
+                if (entry.id > 0) {
+                    databaseManager.updateScheduleStatus(entry.id, entry.status.label);
                 }
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "선택 항목의 시간 파싱에 실패했습니다.");
+                awardCoins(10);
+                loadSchedulesForSelectedDate();
             }
         });
 
@@ -248,24 +247,18 @@ class MainPanel extends JPanel {
         failBtn.addActionListener(e -> {
             int sel = scheduleList.getSelectedIndex();
             if (sel == -1) return;
-            String item = scheduleModel.get(sel);
-            if (item.length() < 5) return;
-            String timeStr = item.substring(0, 5);
-            try {
-                LocalTime lt = LocalTime.parse(timeStr, DateTimeFormatter.ofPattern("HH:mm"));
-                LocalDate selectedDate = (LocalDate) dateSelector.getSelectedItem();
-                TreeMap<LocalTime, String> map = scheduleStore.get(selectedDate);
-                if (map != null && map.containsKey(lt)) {
-                    String content = map.get(lt);
-                    if (!content.contains("실패")) {
-                        map.put(lt, content.replace("미완료", "실패").replace("완료", "실패"));
-                        hpBar.setValue(Math.max(0, hpBar.getValue() - 15));
-                        persistStats();
-                        loadSchedulesForSelectedDate();
-                    }
+            LocalDate selectedDate = (LocalDate) dateSelector.getSelectedItem();
+            List<ScheduleEntry> list = scheduleStore.get(selectedDate);
+            if (list == null || sel >= list.size()) return;
+            ScheduleEntry entry = list.get(sel);
+            if (entry.status != ScheduleStatus.FAILED) {
+                entry.status = ScheduleStatus.FAILED;
+                if (entry.id > 0) {
+                    databaseManager.updateScheduleStatus(entry.id, entry.status.label);
                 }
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "선택 항목의 시간 파싱에 실패했습니다.");
+                hpBar.setValue(Math.max(0, hpBar.getValue() - 15));
+                persistStats();
+                loadSchedulesForSelectedDate();
             }
         });
 
@@ -275,19 +268,14 @@ class MainPanel extends JPanel {
             if (sel == -1) return;
             int confirm = JOptionPane.showConfirmDialog(this, "선택한 일정을 삭제하시겠습니까?", "일정 삭제", JOptionPane.YES_NO_OPTION);
             if (confirm != JOptionPane.YES_OPTION) return;
-            String item = scheduleModel.get(sel);
-            if (item.length() < 5) return;
-            String timeStr = item.substring(0, 5);
-            try {
-                LocalTime lt = LocalTime.parse(timeStr, DateTimeFormatter.ofPattern("HH:mm"));
-                LocalDate selectedDate = (LocalDate) dateSelector.getSelectedItem();
-                TreeMap<LocalTime, String> map = scheduleStore.get(selectedDate);
-                if (map != null && map.containsKey(lt)) {
-                    map.remove(lt);
-                    loadSchedulesForSelectedDate();
+            LocalDate selectedDate = (LocalDate) dateSelector.getSelectedItem();
+            List<ScheduleEntry> list = scheduleStore.get(selectedDate);
+            if (list != null && sel < list.size()) {
+                ScheduleEntry removed = list.remove(sel);
+                if (removed != null && removed.id > 0) {
+                    databaseManager.deleteSchedule(removed.id);
                 }
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "선택 항목의 시간 파싱에 실패했습니다.");
+                loadSchedulesForSelectedDate();
             }
         });
 
@@ -355,15 +343,24 @@ class MainPanel extends JPanel {
 
     public void setUserContext(int userId) {
         this.userId = userId;
+        loadSchedulesFromDatabase();
     }
 
     // 일정 목록 로딩
     private void loadSchedulesForSelectedDate() {
         LocalDate selectedDate = (LocalDate) dateSelector.getSelectedItem();
         scheduleModel.clear();
-        TreeMap<LocalTime, String> map = scheduleStore.getOrDefault(selectedDate, new TreeMap<>());
-        for (Map.Entry<LocalTime, String> e : map.entrySet()) {
-            scheduleModel.addElement(e.getKey().format(DateTimeFormatter.ofPattern("HH:mm")) + " - " + e.getValue());
+        List<ScheduleEntry> list = scheduleStore.getOrDefault(selectedDate, new ArrayList<>());
+        ensureScheduleOrder(selectedDate);
+        for (ScheduleEntry entry : list) {
+            scheduleModel.addElement(entry.time.format(DateTimeFormatter.ofPattern("HH:mm")) + " - " + entry.content + " [" + entry.status.label + "]");
+        }
+    }
+
+    private void ensureScheduleOrder(LocalDate date) {
+        List<ScheduleEntry> list = scheduleStore.get(date);
+        if (list != null) {
+            list.sort(Comparator.comparing(s -> s.time));
         }
     }
 
@@ -484,6 +481,20 @@ class MainPanel extends JPanel {
         }
     }
 
+    private void loadSchedulesFromDatabase() {
+        if (userId <= 0 || databaseManager == null) return;
+
+        scheduleStore.clear();
+        List<DatabaseManager.ScheduleRow> rows = databaseManager.loadAllSchedules(userId);
+        for (DatabaseManager.ScheduleRow row : rows) {
+            ScheduleStatus status = ScheduleStatus.fromLabel(row.status());
+            scheduleStore.computeIfAbsent(row.date(), k -> new ArrayList<>())
+                    .add(new ScheduleEntry(row.id(), row.time(), row.content(), status));
+        }
+        scheduleStore.values().forEach(list -> list.sort(Comparator.comparing(s -> s.time)));
+        loadSchedulesForSelectedDate();
+    }
+
     private void persistStats() {
         if (userId > 0 && databaseManager != null) {
             databaseManager.updateUserStats(userId, coins, hpBar.getValue(), HealthcarePanel.getWeight(), HealthcarePanel.getUserHeight(), HealthcarePanel.getAge());
@@ -496,6 +507,39 @@ class MainPanel extends JPanel {
             return (int)Math.round(66.47 + (13.75 * weight) + (5 * height) - (6.76 * age));
         } else {
             return (int)Math.round(655.1 + (9.56 * weight) + (1.85 * height) - (4.68 * age));
+        }
+    }
+
+    private enum ScheduleStatus {
+        TODO("미완료"),
+        DONE("완료"),
+        FAILED("실패");
+
+        private final String label;
+
+        ScheduleStatus(String label) {
+            this.label = label;
+        }
+
+        static ScheduleStatus fromLabel(String label) {
+            for (ScheduleStatus status : values()) {
+                if (status.label.equals(label)) return status;
+            }
+            return TODO;
+        }
+    }
+
+    private static class ScheduleEntry {
+        private final int id;
+        private final LocalTime time;
+        private final String content;
+        private ScheduleStatus status;
+
+        private ScheduleEntry(int id, LocalTime time, String content, ScheduleStatus status) {
+            this.id = id;
+            this.time = time;
+            this.content = content;
+            this.status = status;
         }
     }
 }
