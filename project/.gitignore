@@ -1,0 +1,2 @@
+# JDBC driver binaries should be downloaded locally and not committed.
+lib/*.jar
