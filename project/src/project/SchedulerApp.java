@@ -2,6 +2,10 @@ package project;
 
 import javax.swing.*;
 import java.awt.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.sql.SQLException;
 
 public class SchedulerApp extends JFrame {
@@ -25,7 +29,24 @@ public class SchedulerApp extends JFrame {
         cardLayout = new CardLayout();
         cards = new JPanel(cardLayout);
 
-        databaseManager = new DatabaseManager("health_scheduler.db");
+        Path storageDir = Paths.get(System.getProperty("user.home"), ".health_scheduler");
+        try {
+            Files.createDirectories(storageDir);
+        } catch (Exception e) {
+            throw new RuntimeException("데이터 디렉터리를 준비하는 중 문제가 발생했습니다", e);
+        }
+
+        Path dbFile = storageDir.resolve("health_scheduler.db");
+        Path legacyDb = Paths.get("health_scheduler.db").toAbsolutePath();
+        try {
+            if (Files.exists(legacyDb) && Files.notExists(dbFile)) {
+                Files.move(legacyDb, dbFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("기존 데이터베이스를 이동하는 중 문제가 발생했습니다", e);
+        }
+
+        databaseManager = new DatabaseManager(dbFile.toAbsolutePath().toString());
         try {
             databaseManager.initialize();
         } catch (SQLException e) {
