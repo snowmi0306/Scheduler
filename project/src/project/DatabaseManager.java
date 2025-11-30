@@ -35,11 +35,11 @@ public class DatabaseManager {
                     "is_registered INTEGER NOT NULL DEFAULT 1" +
                     ")");
 
-            // 기존 스키마에 age가 없다면 추가 (이미 있으면 무시)
-            try {
-                stmt.execute("ALTER TABLE user ADD COLUMN age INTEGER NOT NULL DEFAULT 0");
-            } catch (SQLException ignored) {
-            }
+            // 과거 버전 호환: 누락된 컬럼은 ALTER TABLE로 추가 시도
+            addColumnIfMissing(conn, "user", "age", "age INTEGER NOT NULL DEFAULT 0");
+            addColumnIfMissing(conn, "user", "coin", "coin INTEGER NOT NULL DEFAULT 0");
+            addColumnIfMissing(conn, "user", "hp", "hp INTEGER NOT NULL DEFAULT 100");
+            addColumnIfMissing(conn, "user", "is_registered", "is_registered INTEGER NOT NULL DEFAULT 1");
 
             stmt.execute("CREATE TABLE IF NOT EXISTS exercise_log (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -66,7 +66,43 @@ public class DatabaseManager {
                     "hours REAL NOT NULL," +
                     "FOREIGN KEY (user_id) REFERENCES user(id)" +
                     ")");
+
+            stmt.execute("CREATE TABLE IF NOT EXISTS shop_item (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "name TEXT NOT NULL," +
+                    "price INTEGER NOT NULL" +
+                    ")");
+
+            stmt.execute("CREATE TABLE IF NOT EXISTS user_item (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "user_id INTEGER NOT NULL," +
+                    "item_id INTEGER NOT NULL," +
+                    "FOREIGN KEY (user_id) REFERENCES user(id)," +
+                    "FOREIGN KEY (item_id) REFERENCES shop_item(id)" +
+                    ")");
         }
+    }
+
+    private void addColumnIfMissing(Connection conn, String table, String columnName, String columnDef) throws SQLException {
+        if (columnExists(conn, table, columnName)) {
+            return;
+        }
+
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("ALTER TABLE " + table + " ADD COLUMN " + columnDef);
+        }
+    }
+
+    private boolean columnExists(Connection conn, String table, String columnName) throws SQLException {
+        String pragma = "PRAGMA table_info(" + table + ")";
+        try (PreparedStatement ps = conn.prepareStatement(pragma); ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                if (columnName.equalsIgnoreCase(rs.getString("name"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public Optional<User> loadFirstUser() {
